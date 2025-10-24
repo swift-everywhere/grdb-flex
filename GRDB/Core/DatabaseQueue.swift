@@ -234,7 +234,7 @@ extension DatabaseQueue: DatabaseReader {
     }
     
     public func read<T: Sendable>(
-        _ value: @escaping @Sendable (Database) throws -> T
+        _ value: @Sendable (Database) throws -> T
     ) async throws -> T {
         try await writer.execute { db in
             try db.isolated(readOnly: true) {
@@ -248,8 +248,14 @@ extension DatabaseQueue: DatabaseReader {
     ) {
         writer.async { db in
             defer {
-                // Ignore error because we can not notify it.
-                try? db.commit()
+                // Commit or rollback, but make sure we leave the read-only transaction
+                // (commit may fail with a CancellationError).
+                do {
+                    try db.commit()
+                } catch {
+                    try? db.rollback()
+                }
+                assert(!db.isInsideTransaction)
                 try? db.endReadOnly()
             }
             
@@ -272,7 +278,7 @@ extension DatabaseQueue: DatabaseReader {
     }
     
     public func unsafeRead<T: Sendable>(
-        _ value: @escaping @Sendable (Database) throws -> T
+        _ value: @Sendable (Database) throws -> T
     ) async throws -> T {
         try await writer.execute(value)
     }
@@ -296,8 +302,14 @@ extension DatabaseQueue: DatabaseReader {
             GRDBPrecondition(!db.isInsideTransaction, "must not be called from inside a transaction.")
 
             defer {
-                // Ignore error because we can not notify it.
-                try? db.commit()
+                // Commit or rollback, but make sure we leave the read-only transaction
+                // (commit may fail with a CancellationError).
+                do {
+                    try db.commit()
+                } catch {
+                    try? db.rollback()
+                }
+                assert(!db.isInsideTransaction)
                 try? db.endReadOnly()
             }
             
@@ -385,7 +397,7 @@ extension DatabaseQueue: DatabaseWriter {
     }
     
     public func writeWithoutTransaction<T: Sendable>(
-        _ updates: @escaping @Sendable (Database) throws -> T
+        _ updates: @Sendable (Database) throws -> T
     ) async throws -> T {
         try await writer.execute(updates)
     }
@@ -396,7 +408,7 @@ extension DatabaseQueue: DatabaseWriter {
     }
     
     public func barrierWriteWithoutTransaction<T: Sendable>(
-        _ updates: @escaping @Sendable (Database) throws -> T
+        _ updates: @Sendable (Database) throws -> T
     ) async throws -> T {
         try await writer.execute(updates)
     }

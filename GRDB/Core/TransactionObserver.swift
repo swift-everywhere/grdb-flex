@@ -1252,16 +1252,16 @@ private struct CopiedDatabaseEventImpl: DatabaseEventImpl {
 
 public struct DatabasePreUpdateEvent {
     
-    /// An event kind
-    public enum Kind: CInt {
-        /// SQLITE_INSERT
-        case insert = 18
+    /// An event kind.
+    public enum Kind: CInt, Sendable {
+        /// An insertion event
+        case insert = 18 // SQLITE_INSERT
         
-        /// SQLITE_DELETE
-        case delete = 9
+        /// A deletion event
+        case delete = 9 // SQLITE_DELETE
         
-        /// SQLITE_UPDATE
-        case update = 23
+        /// An update event
+        case update = 23 // SQLITE_UPDATE
     }
     
     /// The event kind
@@ -1494,7 +1494,7 @@ private struct MetalDatabasePreUpdateEventImpl: DatabasePreUpdateEventImpl {
         sqlite_func: (_ connection: SQLiteConnection, _ column: CInt, _ value: inout SQLiteValue? ) -> CInt)
     -> DatabaseValue?
     {
-        var value: SQLiteValue? = nil
+        var value: SQLiteValue?
         guard sqlite_func(connection, column, &value) == SQLITE_OK else { return nil }
         if let value {
             return DatabaseValue(sqliteValue: value)

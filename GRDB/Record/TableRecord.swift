@@ -61,11 +61,11 @@ import Foundation
 /// - ``all()``
 /// - ``annotated(with:)-4xoen``
 /// - ``annotated(with:)-8ce7u``
-/// - ``annotated(with:)-9qvhi``
-/// - ``annotated(with:)-12q5i``
+/// - ``annotated(with:)-58am5``
+/// - ``annotated(with:)-12jwq``
 /// - ``annotated(withOptional:)``
 /// - ``annotated(withRequired:)``
-/// - ``filter(_:)-2l1zl``
+/// - ``filter(_:)-4xvdh``
 /// - ``filter(id:)``
 /// - ``filter(ids:)``
 /// - ``filter(key:)-9ey53``
@@ -84,15 +84,15 @@ import Foundation
 /// - ``matching(_:)-22m4o``
 /// - ``matching(_:)-1t8ph``
 /// - ``none()``
-/// - ``order(_:)-4h1zh``
-/// - ``order(_:)-21efu``
+/// - ``order(_:)-4j3ej``
+/// - ``order(_:)-53dja``
 /// - ``order(literal:)``
 /// - ``order(sql:arguments:)``
 /// - ``orderByPrimaryKey()``
 /// - ``request(for:)``
-/// - ``select(_:)-8pytw``
-/// - ``select(_:)-3aslb``
-/// - ``select(_:as:)-9s48t``
+/// - ``select(_:)-1bgd1``
+/// - ``select(_:)-8yqls``
+/// - ``select(_:as:)-7zz91``
 /// - ``select(literal:)``
 /// - ``select(literal:as:)``
 /// - ``select(sql:arguments:)``
@@ -134,7 +134,7 @@ import Foundation
 /// - ``select(_:as:)-tjh0``
 /// - ``updateAll(_:onConflict:_:)-7vv9x``
 /// - ``updateAll(_:onConflict:_:)-7atfw``
-public protocol TableRecord {
+public protocol TableRecord: GRDBSendableMetatype {
     /// A type that defines columns.
     ///
     /// For example:
@@ -209,6 +209,10 @@ public protocol TableRecord {
     /// // SELECT * FROM player
     /// try Player.fetchAll(db)
     /// ```
+    ///
+    /// You can specify the name of a database table, or the name of a
+    /// database view. When you target a database view, some extra
+    /// configuration might be needed. Please check <doc:ViewRecords>.
     static var databaseTableName: String { get }
     
     /// The columns selected by the record.
@@ -783,9 +787,8 @@ extension TableRecord {
     public static func updateAll(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
-        assignments: (DatabaseComponents) -> [ColumnAssignment])
-    throws -> Int
-    {
+        assignments: (DatabaseComponents) throws -> [ColumnAssignment]
+    ) throws -> Int {
         try updateAll(db, onConflict: conflictResolution, assignments(databaseComponents))
     }
 
@@ -816,9 +819,8 @@ extension TableRecord {
     public static func updateAll(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
-        assignment: (DatabaseComponents) -> ColumnAssignment)
-    throws -> Int
-    {
+        assignment: (DatabaseComponents) throws -> ColumnAssignment
+    ) throws -> Int {
         try updateAll(db, onConflict: conflictResolution, [assignment(databaseComponents)])
     }
     

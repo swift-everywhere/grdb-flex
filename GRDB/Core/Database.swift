@@ -113,6 +113,11 @@ let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_
 /// - ``resumeNotification``
 /// - ``suspendNotification``
 ///
+/// ### The Schema Source
+///
+/// - ``schemaSource``
+/// - ``withSchemaSource(_:execute:)``
+///
 /// ### Other Database Operations
 ///
 /// - ``add(tokenizer:)``
@@ -169,7 +174,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     ///   connection has been opened is an SQLite misuse, and has no effect.
     ///
     /// Related SQLite documentation: <https://www.sqlite.org/errlog.html>
-    nonisolated(unsafe) public static var logError: LogErrorFunction? = nil {
+    nonisolated(unsafe) public static var logError: LogErrorFunction? {
         didSet {
             if logError != nil {
                 _registerErrorLogCallback { (_, code, message) in
@@ -186,6 +191,19 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     
     /// The database configuration.
     public let configuration: Configuration
+    
+    /// The current schema source.
+    ///
+    /// By default, it is the ``Configuration/schemaSource``
+    /// of ``configuration``. To modify the schema source,
+    /// use ``withSchemaSource(_:execute:)``.
+    ///
+    /// The schema source is automatically disabled (nil) during database
+    /// migrations performed by ``DatabaseMigrator``: those access the raw
+    /// SQLite schema, unaltered. If a migration needs a schema source,
+    /// you may call ``Database/withSchemaSource(_:execute:)`` from within
+    /// the body of a migration.
+    public internal(set) var schemaSource: (any DatabaseSchemaSource)?
     
     /// A description of this database connection.
     ///
@@ -442,6 +460,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         self.sqliteConnection = try Database.openConnection(path: path, flags: configuration.SQLiteOpenFlags)
         self.description = description
         self.configuration = configuration
+        self.schemaSource = configuration.schemaSource
         self.path = path
         
         // We do not report read-only transactions to transaction observers, so
@@ -459,7 +478,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     
     private static func openConnection(path: String, flags: CInt) throws -> SQLiteConnection {
         // See <https://www.sqlite.org/c3ref/open.html>
-        var sqliteConnection: SQLiteConnection? = nil
+        var sqliteConnection: SQLiteConnection?
         let code = sqlite3_open_v2(path, &sqliteConnection, flags, nil)
         guard code == SQLITE_OK else {
             // https://www.sqlite.org/c3ref/open.html
@@ -806,7 +825,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
             collationPointer,
             { (collationPointer, length1, buffer1, length2, buffer2) in
                 let collation = Unmanaged<DatabaseCollation>.fromOpaque(collationPointer!).takeUnretainedValue()
-                return CInt(collation.function(length1, buffer1, length2, buffer2).rawValue)
+                return collation.xCompare(length1, buffer1.unsafelyUnwrapped, length2, buffer2.unsafelyUnwrapped)
             }, nil)
         guard code == SQLITE_OK else {
             // Assume a GRDB bug: there is no point throwing any error.
@@ -1149,7 +1168,9 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     
     // See <https://www.sqlite.org/c3ref/interrupt.html>
     func interrupt() {
-        sqlite3_interrupt(sqliteConnection)
+        if let sqliteConnection {
+            sqlite3_interrupt(sqliteConnection)
+        }
     }
     
     // MARK: - Database Suspension
@@ -1223,22 +1244,31 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         }
     }
     
-    /// Cancels the current database access. All statements but ROLLBACK
-    /// will throw `CancellationError`, until `uncancel()` is called.
-    ///
-    /// This method can be called from any thread.
-    func cancel() {
-        let needsInterrupt = suspensionMutex.withLock { suspension in
-            if suspension.isCancelled {
-                return false
+    /// Returns a closure that cancels the current database access.
+    /// Most statements will throw `CancellationError`, until `uncancel()`
+    /// is called.
+    var cancel: @Sendable () -> Void {
+        // Workaround the fact that SQLiteConnection is not Sendable.
+        struct Connection: @unchecked Sendable {
+            var sqliteConnection: SQLiteConnection?
+        }
+        let connection = Connection(sqliteConnection: sqliteConnection)
+        
+        return { [suspensionMutex, connection] in
+            let needsInterrupt = suspensionMutex.withLock { suspension in
+                if suspension.isCancelled {
+                    return false
+                }
+                
+                suspension.isCancelled = true
+                return suspension.interruptsWhenCancelled
             }
             
-            suspension.isCancelled = true
-            return suspension.interruptsWhenCancelled
-        }
-        
-        if needsInterrupt {
-            interrupt()
+            if needsInterrupt {
+                if let sqliteConnection = connection.sqliteConnection {
+                    sqlite3_interrupt(sqliteConnection)
+                }
+            }
         }
     }
     
@@ -1275,7 +1305,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         
         // Don't return String.fetchOne(self, sql: "PRAGMA journal_mode"), so
         // that we don't create an infinite loop in checkForSuspensionViolation(from:)
-        var statement: SQLiteStatement? = nil
+        var statement: SQLiteStatement?
         let sql = "PRAGMA journal_mode"
         sqlite3_prepare_v2(sqliteConnection, sql, -1, &statement, nil)
         defer { sqlite3_finalize(statement) }
@@ -1315,6 +1345,11 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         // to `sqlite3_exec`, so that transaction observers are
         // properly notified.
         if statement.transactionEffect == .rollbackTransaction {
+            return
+        }
+        
+        // Commits when read-only are just like rollbacks above.
+        if statement.transactionEffect == .commitTransaction && isReadOnly {
             return
         }
         
@@ -1467,7 +1502,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         // Now that transaction has begun, we'll rollback in case of error.
         // But we'll throw the first caught error, so that user knows
         // what happened.
-        var firstError: Error? = nil
+        var firstError: Error?
         let needsRollback: Bool
         do {
             let completion = try operations()
@@ -1610,7 +1645,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         // Now that savepoint has begun, we'll rollback in case of error.
         // But we'll throw the first caught error, so that user knows
         // what happened.
-        var firstError: Error? = nil
+        var firstError: Error?
         let needsRollback: Bool
         do {
             let completion = try operations()
@@ -1728,7 +1763,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         if isInsideTransaction {
             try execute(sql: "ROLLBACK TRANSACTION")
         }
-        assert(sqlite3_get_autocommit(sqliteConnection) != 0)
+        assert(!isInsideTransaction)
     }
     
     /// Commits a database transaction.
@@ -1982,6 +2017,34 @@ extension Database {
     }
 }
 #endif
+
+extension Database {
+    /// Returns the count of changes executed by one statement execution.
+    func countChanges<T>(_ count: inout Int, forTable tableName: String, updates: () throws -> T) throws -> T {
+        // Database.changesCount calls sqlite3_changes(), whose documentation says:
+        //
+        // > https://sqlite.org/c3ref/changes.html
+        // > Changes to a view that are intercepted by INSTEAD OF triggers are not counted.
+        //
+        // We want to support INSTEAD OF triggers, so we prefer to use
+        // sqlite3_total_changes() for views.
+        //
+        // At the same time, FTS5 has sqlite3_total_changes() report changes
+        // even when database is not changed (https://github.com/groue/GRDB.swift/issues/1820)
+        //
+        // Well, let's do our best:
+        if try viewExists(tableName) {
+            let prevCount = totalChangesCount
+            let result = try updates()
+            count = totalChangesCount - prevCount
+            return result
+        } else {
+            let result = try updates()
+            count = changesCount
+            return result
+        }
+    }
+}
 
 extension Database {
     

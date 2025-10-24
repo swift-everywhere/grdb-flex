@@ -7,6 +7,9 @@ GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: 
 
 #### 7.x Releases
 
+- `7.8.x` Releases - [7.8.0](#780)
+- `7.7.x` Releases - [7.7.0](#770) - [7.7.1](#771)
+- `7.6.x` Releases - [7.6.0](#760) - [7.6.1](#761)
 - `7.5.x` Releases - [7.5.0](#750)
 - `7.4.x` Releases - [7.4.0](#740) - [7.4.1](#741)
 - `7.3.x` Releases - [7.3.0](#730)
@@ -136,6 +139,43 @@ GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: 
 - [0.110.0](#01100), ...
 
 ---
+
+## 7.8.0
+
+Released October 2, 2025
+
+- **New**: Merged Migrations by [@groue](https://github.com/groue) in [#1818](https://github.com/groue/GRDB.swift/pull/1818)
+
+## 7.7.1
+
+Released September 29, 2025
+
+- **Fixed**: Fix the save() method for record types with attached triggers by [@groue](https://github.com/groue) in [#1822](https://github.com/groue/GRDB.swift/pull/1822)
+
+## 7.7.0
+
+Released September 23, 2025
+
+- **New**: Update GRDB7MigrationGuide.md reference by [@emmanuel-ferdman](https://github.com/emmanuel-ferdman) in [#1807](https://github.com/groue/GRDB.swift/pull/1807)
+- **New**: Persistable Database Views by [@groue](https://github.com/groue) in [#1810](https://github.com/groue/GRDB.swift/pull/1810)
+- **New**: Support for Xcode 26 by [@groue](https://github.com/groue) in [#1813](https://github.com/groue/GRDB.swift/pull/1813)
+- **Fixed**: Fix another race condition regarding Task cancellation, completing [#1797](https://github.com/groue/GRDB.swift/pull/1797)
+
+## 7.6.1
+
+Released July 23, 2025
+
+- **Fixed**: Fix race condition regarding Task cancellation by [@groue](https://github.com/groue) in [#1797](https://github.com/groue/GRDB.swift/pull/1797)
+ 
+## 7.6.0
+
+Released July 20, 2025
+
+- **New**: All closures that accept DatabaseComponents can throw by [@groue](https://github.com/groue) in [#1768](https://github.com/groue/GRDB.swift/pull/1768)
+- **New**: Add Sendable conformance to DatabasePreUpdateEvent.Kind, matching DatabaseEvent.Kind by [@Jason-Abbott](https://github.com/Jason-Abbott) in [#1773](https://github.com/groue/GRDB.swift/pull/1773)
+- **New**: Add custom build instruction for hardened runtime by [@Jason-Abbott](https://github.com/Jason-Abbott) in [#1776](https://github.com/groue/GRDB.swift/pull/1776)
+- **New**: Access task locals from asynchronous database accesses by [@groue](https://github.com/groue) in [#1794](https://github.com/groue/GRDB.swift/pull/1794)
+- **New**: Throwing row accessors by [@groue](https://github.com/groue) in [#1796](https://github.com/groue/GRDB.swift/pull/1796)
 
 ## 7.5.0
 
