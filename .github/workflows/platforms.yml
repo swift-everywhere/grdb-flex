@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: "Test Swift Package iOS"
-        run: xcodebuild test -sdk "iphonesimulator" -destination "platform=iOS Simulator,name=$(xcrun simctl list devices --json | jq -r '.devices | to_entries[] | .value[] | select(.availability == "(available)" or .isAvailable == true) | .name' | grep -E '^iPhone [0-9]+$' | sort -V | tail -n 1)" -scheme "$(xcodebuild -list -json | jq -r '.workspace.schemes[-1]')"
+        run: xcodebuild test -sdk "iphonesimulator" -destination "platform=iOS Simulator,name=iPhone 17" -project GRDB.xcodeproj -scheme GRDB
   macos:
     runs-on: macos-latest
     steps:
