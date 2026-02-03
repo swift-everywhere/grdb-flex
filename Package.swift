@@ -91,7 +91,6 @@ let package = Package(
                 // GRDB+SQLCipher: Uncomment the SQLCipher and GRDBSQLCipher dependencies
                 //.product(name: "SQLCipher", package: "SQLCipher.swift"),
                 .product(name: "SQLCipher", package: "swift-sqlcipher"),
-                .target(name: "GRDBSQLCipher"),
             ],
             path: "GRDB",
             resources: [.copy("PrivacyInfo.xcprivacy")],
