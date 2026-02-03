@@ -44,7 +44,16 @@ if ProcessInfo.processInfo.environment["SPI_BUILDER"] == "1" {
 //swiftSettings.append(.define("SQLITE_HAS_CODEC"))
 //swiftSettings.append(.define("SQLCipher"))
 
-dependencies.append(.package(url: "https://github.com/skiptools/swift-sqlcipher", branch: "sqlite-traits"))
+dependencies
+    .append(
+        .package(
+            url: "https://github.com/skiptools/swift-sqlcipher",
+            branch: "sqlite-traits",
+            traits: [
+                "ENABLE_FTS4",
+            ]
+        )
+    )
 cSettings.append(.define("SQLITE_HAS_CODEC"))
 swiftSettings.append(.define("SQLITE_HAS_CODEC"))
 swiftSettings.append(.define("SQLCipher"))
