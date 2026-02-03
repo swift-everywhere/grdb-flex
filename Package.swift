@@ -47,15 +47,10 @@ if ProcessInfo.processInfo.environment["SPI_BUILDER"] == "1" {
 dependencies
     .append(
         .package(
-            url: "https://github.com/skiptools/swift-sqlcipher",
-            branch: "sqlite-traits",
-            traits: [
-                "ENABLE_FTS4",
-            ]
+            url: "https://github.com/skiptools/swift-sqlcipher", branch: "sqlite-traits"
+            //path: "../../skiptools/swift-sqlcipher",
         )
     )
-cSettings.append(.define("SQLITE_HAS_CODEC"))
-swiftSettings.append(.define("SQLITE_HAS_CODEC"))
 swiftSettings.append(.define("SQLCipher"))
 
 let package = Package(
